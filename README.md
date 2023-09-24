@@ -50,7 +50,7 @@ Model accuracy was compared using Mean Error (ME) and Root Mean Squared Error (R
 
 Based on the analysis, the ARIMA model is recommended to forecast US candy production. It provided the most accurate forecasts and had well-behaved residuals. The forecast suggests an increase in candy production over the next one to two years.
 
-For detailed code and analysis, please refer to the [RMarkdown file](forecast_candy_production.Rmd) and the generated [HTML report](forecast_candy_production.html).
+For detailed code and analysis, please refer to the RMarkdown file and the generated HTML report.
 
 ---
 
