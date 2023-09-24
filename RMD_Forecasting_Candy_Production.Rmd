@@ -1,0 +1,611 @@
+---
+title: "Forecasting Candy Production Index in the US"
+author: "Ajay Vishnu Addala"
+date: "09/22/2023"
+output: html_document
+---
+
+```{r}
+library(fpp)
+library(fpp2)
+library(TTR)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(forecast)
+IPG3113N <- read_csv("IPG3113N.csv")
+candy_ts_original <- ts(IPG3113N$IPG3113N,frequency = 12,start=c(2012,10))
+```
+
+## About the Data
+
+#### About
+
+* Sweets, chocolates, and candy are universally enjoyed. In the US, there are holidays themed around giving candy! All this consumption first needs production. The dataset below shows the monthly production of candy in the US. The industrial production index measures the actual output of all relevant establishments in the United States, regardless of ownership, but not those in U.S. territories. 
+
+#### Data Source
+
+* Link: https://fred.stlouisfed.org/series/IPG3113N
+
+#### Data Dictionary
+
+* Date: Year, Month, and Date during with the data was recorded
+* IPG3113N: Production Index for Candy in the US
+
+## Question and Hypothesis
+
+#### Question
+* What will be the best method to forecast the given time series data?
+
+#### Hypothesis
+* Expanding our knowledge from previous forecasting techniques, the modern ANOVA method might give us the best forecast for time series.
+* We can check this hypothesis based on the accuracy of each model that we can check below.
+
+## Plot and Inference
+
+##### Time Series Plot
+
+```{r}
+plot(candy_ts_original, main = 'Monthly production index of candy in the US', xlab = 'Year', ylab = 'Prodcution Index of candy')
+```
+
+* We start with plotting the time series to visualise and understand the data.
+
+##### Initial Observations
+
+* The data from 2012 has seasonal variation and is peaking every November and December every year.
+* This is because of the holiday season every year that has Thanksgiving and Christmas.
+* However, from 2020, the data has an increasing trend and seasonal component.
+* To explore this idea more, we consider a window starting from 2020 and considering two years of data will be good enough for a proper forecast.
+
+#### Considering only a window
+
+```{r}
+candy_ts <- window(candy_ts_original, start = 2020)
+plot(candy_ts, main = 'Monthly production of candy in the US from 2020', xlab = 'Year', ylab = 'Production of candy')
+```
+
+* Considering the window function, the plot has both trend and seasonality.
+* Forecasting this data will be more accurate as it is the recent data, and there is a high chance that the future data will have the same trend and seasonality.
+* Further analysis of the data will be done considering this data set.
+
+## Central Tendency
+
+##### Min, max, mean, median, 1st and 3rd Quartile values of the times series
+
+```{r}
+summary(candy_ts)
+```
+
+* The summary function above gives the min, max, mean, median, 1st and 3rd Quartile values of the times series.
+
+##### Box Plot
+
+```{r}
+boxplot(candy_ts, main = 'Boxplot of the production of candy in the US')
+hist(candy_ts, main = 'Histogram of the production of candy in the US')
+Acf(candy_ts)
+```
+
+##### Observations and Inferences 
+
+* The boxplot shows that there are no outliers in the data.
+* The data has a mean of 105.63 and doesn't look to have a proper normal distribution.
+* The median is in between the 1st and 3rd quartile and is not specifically towards one of them.
+* From the summary, we can also see that the median value is less than the mean for the time series.
+* This means that the data is right-skewed. This can be justified by seeing the histogram above as well.
+* The ACF plot shows a strong trend and seasonality in the data. The trend can be inferred based on the number of lines crossing the confidence interval.
+* The strong seasonality can be inferred based on the wavy nature of the Acf plot, and the seasonality period is 12 months. We can see a peak and dip every six months simultaneously.
+* We can observe the same thing in the plot as well.
+
+## Decomposition
+
+##### Decomposition Plot
+
+```{r}
+stl_dec <- stl(candy_ts,s.window ="periodic")
+plot(stl_dec, main = 'Decomposition plot')
+```
+
+##### Decomposition characteristic
+
+```{r}
+dec <- decompose(candy_ts)
+dec$type
+```
+
+* The decomposition is additive.
+* Because, with as trend increases, we do not see any increase in the seasonality. The seasonality appears to be the same throughout.
+
+##### Seasonal monthly indices
+
+```{r}
+dec$figure
+```
+
+##### Observations and Inferences
+
+* The time series is the highest for the month of December.
+* The time series is the lowest for the month of July.
+
+##### Plausible reasons
+
+* The reason might be because of the winter holidays and Christmas season.
+* Being a festival season, people purchase more candy during this season than the rest of the year.
+* July, being the summer, may be the production going down and from July, the production restarts in numbers to cater for the demand of Thanksgiving and Christmas.
+
+##### Seasonality adjusted plot
+
+```{r}
+plot(candy_ts, main='Seasonal adjusted', xlab='n', ylab='n')
+lines(seasadj(stl_dec), col="Red")
+```
+
+* The seasonality has significant fluctuations in the value of the time series.
+* This is expected, as the data showed strong seasonality in the ACF plot.
+
+## Testing various Forecasting methods for the given dataset
+
+## Naïve Method
+
+##### Q: Output
+```{r}
+naive_for = naive(candy_ts)
+plot(naive_for, main = 'Naive Forecast', xlab='Year', ylab='Production of candy in the US')
+```
+
+##### Residual Analysis
+
+```{r}
+plot(naive_for$residuals, main = 'Naive Forecast Residuals', xlab='Year', ylab='Residuals')
+```
+
+* The residuals have randomness until the year 2022.
+* From 2022, the residuals have an increasing trend. This means we still need to include some factors to be considered.
+* The residuals have a mean of around zero. This can be checked in the histogram plot next.
+
+###### Residuals Histogram
+
+```{r}
+hist(naive_for$residuals, main = 'Histogram plot for Naive Forecast Residuals')
+```
+
+* The histogram appears to be normally distributed.
+* But the values do not have a mean zero. The histogram appears to be skewed on one side.
+* This means that the data is biased as the mean is not zero.
+
+###### Fitted vs Residual Values
+
+```{r}
+plot(as.numeric(fitted(naive_for)), residuals(naive_for), type='p', main = 'Fitted vs Residuals', ylab='Residuals', xlab='Fitted Values')
+```
+
+* The Fitted vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* However, there appear to be three outliers in the plot.
+
+###### Actual vs Residual values
+
+```{r}
+plot(as.numeric(candy_ts), residuals(naive_for), type='p', main = 'Actual vs Residuals', ylab='Residuals', xlab='Actual Values')
+```
+
+* The Actual vs Residuals plot appears to have cone shape increasing residuals plot.
+* This means the residuals are increasing with time which is a bad sign.
+* Which means we are missing to consider some variable which is the reason for this abnormal residual plot.
+
+###### ACF of residuals
+
+```{r}
+Acf(naive_for$residuals)
+```
+
+* The Acf of residuals plot shows both trend and seasonality.
+* Ideally the forecast is considered to be good if the Acf of residuals is white noice, meaning there is no trend or seasonality in the data and all the lines in the Acf plot are within the confidence interval.
+* In this case, we missed some variable which is strongly affecting the residuals.
+
+##### Accuracy
+
+```{r}
+accuracy(naive_for)
+```
+
+##### Forecast 
+
+```{r}
+forecast(naive_for)
+plot(forecast(naive_for), main = 'Naive Forecast for the next 12 months', xlab='Year', ylab='Production of candy in the US')
+```
+
+##### Naive Method Summary
+
+* The ME and RMSE values are very low, indicating that this method is suitable. But, it differs from what we can see as a trend and seasonality in the residuals.
+* We can consider more forecasting techniques and check if the residuals are random.
+* From 2020, there is an increasing trend in the residuals. We can try a naive method with a drift component, which may yield a better forecast.
+* From the Acf of the residual plot, we can see that the residuals also have seasonality. So, we need to check other forecasting methods as well.
+
+
+## Simple Moving Averages
+
+##### Simple Moving average of order 3, 6, and 9
+
+```{r}
+mavg3_forecast = ma(candy_ts,order=3)
+mavg6_forecast = ma(candy_ts,order=6)
+mavg9_forecast = ma(candy_ts,order=9) 
+plot(candy_ts, main = "Plot along with moving averages", xlab='Year', ylab='Production of candy in the US')
+lines(mavg3_forecast, col="Red")
+lines(mavg6_forecast, col="Blue")
+lines(mavg9_forecast, col="Green")
+```
+
+##### Observations
+
+* From the plots, it is observed that the higher the order we consider, the smoother the moving average curve in the plot.
+* It can be seen that the Green line above is the smoothest compared to Blue or Red lines.
+* The Red line (order 3) gives the most real data compared to the other two. The higher order averages smoother the plot and do not give the actual values.
+
+
+## Simple Smoothing
+
+```{r}
+ses_fit <- ses(candy_ts)
+plot(ses_fit, main='Simple smoothing Forecast', xlab='Year', ylab='Production of candy in the US')
+attributes(ses_fit)
+```
+
+###### Observations
+
+```{r}
+summary(ses_fit)
+```
+
+* Alpha = 0.9999
+* Alpha specifies the coefficient for the level smoothing. 
+* Values near 1.0 mean that the latest value has more weight.
+* Initial state: l = 100.0911 
+* Sigma: 7.5146. Sigma defines the variance in the forecast predicted.
+
+##### Residual Analysis
+
+```{r}
+plot(ses_fit$residuals, main='Simple smoothing Residuals plot', xlab='Year', ylab='Residuals')
+```
+
+* The residuals seem to be have randomness til the year 2022.
+* From 2022, the residuals seem to have an increasing trend. Which means we have missed some factor to be considered.
+* The residuals seem to have a mean around zero. This can be checked in the histogram plot next.
+
+###### Histogram plot of residuals
+
+```{r}
+hist(ses_fit$residuals, main='Histogram of Simple smoothing Residuals plot')
+```
+
+* The histogram appears to be normally distributed.
+* But the values do not have a mean zero. The histogram appears to be skewed on one side.
+* This means that the data is biased as the mean is not zero.
+
+###### Fitted values vs. residuals
+
+```{r}
+plot(as.numeric(fitted(ses_fit)), residuals(ses_fit), type='p', main = 'Fitted vs Residual', ylab='Residuals', xlab='Fitted Values')
+```
+
+* The Fitted vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* The plot however seems to have 3 outliers.
+
+###### Actual values vs. residuals
+
+```{r}
+plot(as.numeric(candy_ts), residuals(ses_fit), type='p', main = 'Actual vs Residual', ylab='Residuals', xlab='Actual Values')
+```
+
+* The Actual vs Residuals plot appears to have cone shape increasing residuals plot.
+* This means the residuals are increasing with time which is a bad sign.
+* Which means we are missing to consider some variable which is the reason for this abnormal residual plot.
+
+###### ACF plot of the residuals
+
+```{r}
+Acf(ses_fit$residuals)
+```
+
+* The Acf of residuals plot shows both trend and seasonality.
+* Ideally the forecast is considered to be good if the Acf of residuals is white noice, meaning there is no trend or seasonality in the data and all the lines in the Acf plot are within the confidence interval.
+* In this case, we missed some variable which is strongly affecting the residuals.
+
+##### Accuracy
+
+```{r}
+accuracy(ses_fit)
+```
+
+##### Q: Forecast 
+
+```{r}
+ses(candy_ts, h=12)
+plot(ses(candy_ts, h=12), main = 'Simple smoothing forcast for the next one year', xlab='Year', ylab='Production of candy in the US')
+```
+
+##### Simple Smoothing Summary
+
+* The ME and RMSE values are very low, indicating that this method is suitable. But, it differs from what we can see as a trend and seasonality in the residuals.
+* We can consider more forecasting techniques and check if the residuals are random.
+* From 2020, there is an increasing trend in the residuals. This means we still need some variable that needs to be considered. 
+* From the Acf of the residual plot, we can see that the residuals also have seasonality. So, we need to check other forecasting methods as well. Next, we check the HoltWinters forecasting method.
+
+
+## Holt-Winters 
+
+```{r}
+HW_forecast <- hw(candy_ts, seasonal = "additive")
+plot(forecast(HW_forecast), main='Holtwinters Forecast', xlab='Year', ylab='Prodcution of candy in the US')
+attributes(HW_forecast)
+hw_add <- forecast(HW_forecast)
+```
+
+* Here, additive Holtwinters method is considered.
+* This is because the seasonality isn't increasing with trend. This is an additive time series.
+
+###### Observations
+
+```{r}
+hw_add$model
+```
+
+* Alpha = 0.0068. Alpha specifies the coefficient for the level smoothing in Holtwinters.
+* Beta = 0.00001. Beta specifies the coefficient for the trend smoothing in Holtwinters. 
+* Gamma = 0.8931. Gamma specifies the coefficient for the seasonal smoothing in Holtwinters.
+* Values 1.0 means that the latest value has highest weight.
+* Initial states:
+    l = 95.8204 
+    b = 0.6373 
+    s = 15.479 13.9148 11.4759 4.4435 0.2118 -8.01
+           -11.3705 -15.3768 -14.5466 1.7751 5.9553 -3.9515
+* Sigma = 5.8034. Sigma defines the variance of the forecast values.
+
+##### Residual Analysis
+
+```{r}
+plot(hw_add$residuals, main='HW Residuals plot', xlab='Year', ylab='Residuals')
+```
+
+* The residuals appear to be random and also the mean looks to be near zero. We can check this with histogram.
+* We can observe a couple of up and downs throughout. But even they did not show and growing residual pattern.
+
+###### Histogram plot of residuals
+
+```{r}
+hist(hw_add$residuals, main='Histogram of the HW Residuals plot')
+```
+
+* The histogram appears to be normally distributed.
+* And the mean does not appear to be at zero. This means the data is biased and we might have missed some variable.
+
+###### Fitted values vs. residuals
+
+```{r}
+plot(as.numeric(fitted(hw_add)), residuals(hw_add), type='p', main='HW Fitted vs Residuals plot',  ylab='Residuals', xlab='Fitted Values')
+```
+
+* The Fitted vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* The plot however seems to have 2 outliers.
+
+###### Actual values vs. residuals
+
+```{r}
+plot(as.numeric(candy_ts), residuals(hw_add), type='p', main='HW Actual vs Residuals plot',  ylab='Residuals', xlab='Actual Values')
+```
+
+* The Actual vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* The plot however seems to have 4 outliers.
+
+###### ACF plot of the residuals
+
+```{r}
+Acf(hw_add$residuals)
+```
+
+* In the Acf plot, none of the values crossed the confidence levels. It appears to be white noice.
+* This signifies that the forecast is a good forecast.
+* This proves to be the best forecast comparing all the previous ones tested.
+
+##### Accuracy
+
+```{r}
+accuracy(hw_add)
+```
+
+##### Q: Forecast 
+
+```{r}
+forecast(HW_forecast)
+plot(forecast(HW_forecast))
+```
+
+##### Holtwinters Summary
+
+* The ME, RMSE values are quite low compared to any of our previous forecasts.
+* HolWinters is a better forecast compared to naive and simple smoothing.
+* Holtwinters appears to be the best forecast considering all the previous forecast methods.
+* However, this forecast can still be improved as we can try forecasting using ARIMA models.
+
+
+## ARIMA
+
+##### Is Time Series data Stationary?
+
+* The Time Series data is not stationary. 
+* A time series is considered stationary if there is no trend and seasonality in the time series.
+* The time series that we considered has both trend and seasonality. So, it is not stationary.
+
+```{r}
+nsdiffs(candy_ts)
+ndiffs(candy_ts)
+```
+
+* A seasonality component is needed in this case.
+* First, we do the seasonal differencing.
+* This is because once the seasonal differencing is done, in most cases, it will take care of trend differencing itself.
+* We see that the trend differencing is one, but let us check for the trend differencing in the following case after seasonal differencing.
+
+```{r}
+ndiffs((diff(candy_ts,12)))
+```
+
+* As discussed earlier, the ndiffs value is zero now after performing the seasonal differencing.
+* The seasonal differencing took care of trend differencing itself.
+
+```{r}
+candy_arima <- diff(candy_ts,12)
+```
+
+##### Time Series chart of the differenced series. 
+
+```{r}
+plot(candy_arima, main='Time series chart of the differenced series', xlab='Year')
+tsdisplay(candy_arima)
+```
+
+* The time series plot of the differenced series is ploted.
+* Also, the tsdiagram of the differenced series is shown.
+
+##### ACF and PACF plots
+
+```{r}
+Acf(candy_arima)
+Pacf(candy_arima)
+```
+
+##### Observations 
+
+* None of the lines in ACF and PACF are crossing the confidence interval.
+* This means the p, q, P, Q have a maximum value of zero. 
+* The possible ARIMA models can be of the format ARIMA(0,1,0)(0,1,0) or ARIMA(0,0,0)(0,1,0) or ARIMA(0,1,0)(0,0,0) or ARIMA(0,0,0)(0,0,0).
+* However, the system takes in values of p, q, P, Q values other than 0 as well to cross check if there is any other model that has even lower AIC and BIC.
+
+##### AIC, BIC and Sigma^2 for the possible models
+
+```{r}
+fit_arima_mod <- auto.arima(candy_ts,trace=TRUE, stepwise = FALSE )
+fit_arima_mod
+```
+
+* ARIMA model is run automatically and the system selects the model with the last AIC and BIC values.
+
+##### Best model?
+
+* The model with least AIC and BIC values shall be selected.
+* The sigma^2 value should be the highest.
+
+##### Final formula for ARIMA with the coefficients
+
+* Final ARIMA formula: ARIMA(0,0,0)(0,1,0)[12] with drift 
+
+##### Residual Analysis
+
+```{r}
+plot(residuals(fit_arima_mod))
+```
+
+* The residuals appear to be random and also the mean looks to be near zero. We can check this with histogram.
+* We can observe a couple of up and downs throughout. But even they did not show and growing residual pattern.
+
+###### Histogram plot of Residuals
+
+```{r}
+hist(fit_arima_mod$residuals)
+```
+
+* The histogram appears to be normally distributed.
+* But the values do not have a mean zero. The histogram appears to be skewed on one side.
+* This means that the data is biased as the mean is not zero.
+
+###### Fitted values vs. residuals
+
+```{r}
+plot(as.numeric(fitted(fit_arima_mod)), residuals(fit_arima_mod), type='p', ylab='Residuals', xlab='Fitted Values')
+```
+
+* The Fitted vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* The plot however seems to have a few outliers.
+
+###### Actual values vs. residuals
+
+```{r}
+plot(as.numeric(candy_ts), residuals(fit_arima_mod), type='p', ylab='Residuals', xlab='Actual Values')
+```
+
+* The Actual vs Residuals plot appears to be random and do not have any trend.
+* The plot appears to have a mean around zero which is a good sign.
+* The plot however seems to have a few outliers.
+
+###### ACF plot of the residuals
+
+```{r}
+Acf(fit_arima_mod$residuals)
+```
+
+* In the Acf plot, none of the values crossed the confidence levels. It appears to be white noice.
+* This signifies that the forecast is a good forecast.
+* This proves to be the best forecast comparing all the previous ones tested.
+
+##### Accuracy
+
+```{r}
+accuracy(fit_arima_mod)
+```
+
+##### Forecast 
+
+```{r}
+forecast(fit_arima_mod, h=12)
+plot(forecast(fit_arima_mod, h=12))
+```
+
+###### Next two years. Show table and plot
+
+```{r}
+forecast(fit_arima_mod, h=24)
+plot(forecast(fit_arima_mod, h=24))
+```
+
+##### ARIMA Summary
+
+* The ME and RMSE values are quite low compared to our previous forecasts.
+* And all the residual plots also seem random.
+* Considering all these, the ARIMA model seems to be the best forecasting model compared to all the other models that were done above.
+* ARIMA models appear to be the best forecast considering all the previous forecast methods.
+* Considering both accuracy numbers and the residual analysis, ARIMA proves to be the best forecasting model.
+
+
+## Accuracy Summary
+
+```{r}
+accuracy(naive_for)
+accuracy(ses_fit)
+accuracy(hw_add)
+accuracy(fit_arima_mod)
+```
+
+##### Best & Worst Forecasts
+
+* To start with, there is nothing like best or worst forecast.
+* Considering the accuracy data above, ARIMA forecast seems to fit the time series the best as it has the least error values (ME, RMSE).
+* And naive forecast seems to be the worst as it has the largest ME and RMSE values.
+
+## Conclusion
+
+* The data seemed to have seasonality initially.
+* Later, we can consider a window function of the data, which has trend and seasonality from 2020.
+* Based on the four forecasting methods, naive, simple smoothing, HoltWinters, and ARIMA, we can see that ARIMA forecast is the better method.
+* This is because the forecast fits perfectly, and the error values are pretty low for the ARIMA forecast.
+* HoltWinters and ARIMA models have fewer error values than naive and straightforward smoothing. However, HoltWinters has deviations in its residual plots compared to the ARIMA.
+* In conclusion, the ARIMA forecast is the best forecasting model considering both error numbers (accuracy) and the residual analysis.
+* Based on the analysis and forecast, the time series will increase over the next year and two years.
+
